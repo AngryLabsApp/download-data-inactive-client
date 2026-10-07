@@ -166,6 +166,52 @@ def add_sheet(book, title, headers, rows):
         sheet.column_dimensions[col[0].column_letter].width = 20
 
 
+# Pestaña "Cómo usar": lo que se le explica al cliente para cruzar pestañas.
+# Van en negrita los títulos (un solo texto en MAYÚSCULAS) y el encabezado "Código".
+GUIA = [
+    ["CÓMO USAR ESTE ARCHIVO"],
+    [],
+    ["PESTAÑAS"],
+    ["Alumnos", "Un alumno por fila."],
+    ["Catálogo de paquetes", "Cada paquete que vende o vendió el gym (activo = No: ya no se vende)."],
+    ["Paquetes y pagos", "Cada paquete que compró o renovó un alumno, con lo pagado y lo que debe."],
+    ["Asistencias", "Cada asistencia de un alumno, con la compra con la que asistió."],
+    [],
+    ["CÓMO SE RELACIONAN"],
+    ["Código", "Qué identifica", "Está en", "Sirve para"],
+    ["id_alumno", "Un alumno", "Alumnos, Paquetes y pagos, Asistencias",
+     "Traer los datos del alumno de una compra o asistencia"],
+    ["id_plan", "Un tipo de paquete", "Catálogo de paquetes, Paquetes y pagos, Asistencias",
+     "Traer precio, duración y límite de clases del paquete"],
+    ["id_compra", "Una compra concreta", "Paquetes y pagos, Asistencias",
+     "Ver con qué compra asistió el alumno, o cuántas asistencias tuvo cada compra"],
+    [],
+    ["EJEMPLO"],
+    ["Precio del paquete en Asistencias (columna F = id_plan):"],
+    ["=BUSCARV(F2; 'Catálogo de paquetes'!A:C; 3; FALSO)"],
+    ["En Excel en inglés: =VLOOKUP(F2, 'Catálogo de paquetes'!A:C, 3, FALSE)"],
+    [],
+    ["NOTAS"],
+    ["Si pagado y debe están vacíos, es un paquete antiguo: el estado viene en estado_pago."],
+    ["clases_tomadas y limite_clases en Asistencias son los valores al momento de esa asistencia."],
+    ["Las fechas y horas están en la zona horaria del gym."],
+]
+
+
+def add_guide(book):
+    sheet = book.create_sheet("Cómo usar")
+    for row in GUIA:
+        sheet.append(row)
+        cells = sheet[sheet.max_row]
+        if row[:1] == ["Código"] or (len(row) == 1 and row[0].isupper()):
+            for c in cells:
+                c.font = Font(bold=True)
+        if row and row[0].startswith("="):
+            cells[0].data_type = "s"  # mostrar la fórmula de ejemplo, no calcularla
+    for letter, width in zip("ABCD", (22, 22, 45, 70)):
+        sheet.column_dimensions[letter].width = width
+
+
 Path("output").mkdir(exist_ok=True)
 for gym_id in gym_ids:
     gym = sb.table("gyms").select("name,timezone").eq("id", gym_id).maybe_single().execute()
@@ -176,6 +222,7 @@ for gym_id in gym_ids:
 
     book = Workbook()
     book.remove(book.active)
+    add_guide(book)
     for title, (headers, rows) in [
         ("Alumnos", alumnos(gym_id)),
         ("Catálogo de paquetes", catalogo(gym_id)),

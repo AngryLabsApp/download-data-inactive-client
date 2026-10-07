@@ -1,6 +1,6 @@
 # download-data-inactive-client — Guía para Claude
 
-Script Python que exporta la data de un gym de FlowPass a **un Excel con 4 pestañas**.
+Script Python que exporta la data de un gym de FlowPass a **un Excel con 4 pestañas de data + "Cómo usar"**.
 Se usa cuando un cliente (normalmente uno que se va / inactivo) pide "su data".
 
 ## Cómo se corre
@@ -28,7 +28,7 @@ Mismas variables que FlowPassAPI. Para probar sin crear `.env` (apunta a dev):
 | Paquetes y pagos | `historico` + `charges → payments` | cada paquete comprado o renovado |
 | Asistencias | `ingresos` + `planes`, `member_plans`, `groups` | cada asistencia |
 
-**Cruce entre pestañas** (se lo explicamos así al cliente):
+**Cruce entre pestañas** (se lo explicamos así al cliente, en la pestaña "Cómo usar" = `GUIA` en `export.py`; si cambian columnas, actualizarla):
 - `id_alumno` = `members.id`, está en Alumnos, Paquetes y pagos, Asistencias.
 - `id_plan` = `planes.id`. Une catálogo ↔ compras ↔ asistencias.
 - `id_compra` = `pago_id`. Une compra ↔ asistencias (y es la llave hacia `charges`).
