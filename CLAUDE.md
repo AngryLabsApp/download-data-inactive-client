@@ -1,6 +1,6 @@
 # download-data-inactive-client — Guía para Claude
 
-Script Python que exporta la data de un gym de FlowPass a **un Excel con 3 pestañas**.
+Script Python que exporta la data de un gym de FlowPass a **un Excel con 4 pestañas**.
 Se usa cuando un cliente (normalmente uno que se va / inactivo) pide "su data".
 
 ## Cómo se corre
@@ -19,21 +19,23 @@ Mismas variables que FlowPassAPI. Para probar sin crear `.env` (apunta a dev):
 (set -a; source <(grep -E "^SUPABASE_(URL|SERVICE_ROLE_KEY)=" ../FlowPassAPI/.env); set +a; GYM_ID=<id> .venv/bin/python export.py)
 ```
 
-## Las 3 pestañas
+## Las 4 pestañas
 
 | Pestaña | Tabla base | Una fila = |
 |---|---|---|
 | Alumnos | `members` + `members_groups → groups` | un alumno |
+| Catálogo de paquetes | `planes` (incluye eliminados, columna `activo`) | cada paquete que vende/vendió el gym |
 | Paquetes y pagos | `historico` + `charges → payments` | cada paquete comprado o renovado |
 | Asistencias | `ingresos` + `planes`, `member_plans`, `groups` | cada asistencia |
 
 **Cruce entre pestañas** (se lo explicamos así al cliente):
-- `id_alumno` = `members.id`, está en las 3.
-- `id_paquete` = `pago_id`. Une paquete ↔ asistencias (y es la llave hacia `charges`).
+- `id_alumno` = `members.id`, está en Alumnos, Paquetes y pagos, Asistencias.
+- `id_plan` = `planes.id`. Une catálogo ↔ compras ↔ asistencias.
+- `id_compra` = `pago_id`. Une compra ↔ asistencias (y es la llave hacia `charges`).
 
 ## Reglas de negocio (no romper)
 
-- **Solo alumnos no eliminados** (`members.deleted_at is null`) en las 3 pestañas. También se excluyen filas con `deleted_at` propio.
+- **Solo alumnos no eliminados** (`members.deleted_at is null`) en las pestañas de alumnos/compras/asistencias. También se excluyen filas con `deleted_at` propio.
 - **Paquetes salen de `historico`, no de `member_plans`**: `member_plans` guarda solo el ciclo
   actual; cada renovación queda como fila nueva en `historico`. Sin `historico` se pierde cuánto pagó en cada renovación.
 - **`charges` no tiene FK con `historico`**: se cruzan en Python por `pago_id`. Se ignoran charges con `deleted_at` o `estado = cancelado`.

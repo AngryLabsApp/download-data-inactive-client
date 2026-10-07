@@ -72,10 +72,31 @@ def alumnos(gym_id):
     return headers, out
 
 
+def catalogo(gym_id):
+    # incluye eliminados: compras y asistencias viejas los referencian
+    rows = fetch_all(
+        "planes",
+        "id,label,amount,dias_mes,ilimitado,limite_clases,partners,is_free,neverExpires,order,deleted_at",
+        gym_id,
+    )
+    rows.sort(key=lambda p: (p["deleted_at"] is not None, p["order"] or 0, (p["label"] or "").lower()))
+    out = [
+        (p["id"], (p["label"] or "").strip(), p["amount"],
+         None if p["neverExpires"] else p["dias_mes"],
+         "Ilimitado" if p["ilimitado"] else p["limite_clases"],
+         "Sí" if p["partners"] else "No", "Sí" if p["is_free"] else "No",
+         "No" if p["deleted_at"] else "Sí")
+        for p in rows
+    ]
+    headers = ["id_plan", "paquete", "precio", "duracion_dias", "limite_clases",
+               "compartido", "gratis", "activo"]
+    return headers, out
+
+
 def paquetes(gym_id):
     compras = fetch_all(
         "historico",
-        "id,member_id,pago_id,plan,fecha_inicio_plan,proxima_fecha_pago,monto,estado_pago,"
+        "id,member_id,pago_id,plan_id,plan,fecha_inicio_plan,proxima_fecha_pago,monto,estado_pago,"
         "members!inner(apellidos,nombre),planes(label)",
         gym_id, is_null=["deleted_at", "members.deleted_at"],
     )
@@ -94,6 +115,7 @@ def paquetes(gym_id):
         pagos = [p for p in (c["payments"] if c else []) if p["estado"] == "confirmed"]
         out.append((
             h["member_id"], h["pago_id"], h["members"]["apellidos"], h["members"]["nombre"],
+            h["plan_id"],
             (h["planes"] or {}).get("label") or h["plan"],
             to_date(h["fecha_inicio_plan"]),
             to_date(h["proxima_fecha_pago"]),
@@ -104,15 +126,15 @@ def paquetes(gym_id):
             ", ".join(sorted({MEDIOS.get(p["medio_de_pago"], p["medio_de_pago"]) for p in pagos if p["medio_de_pago"]})) or None,
             max((to_date(p["paid_at"]) for p in pagos if p["paid_at"]), default=None),
         ))
-    headers = ["id_alumno", "id_paquete", "apellidos", "nombre", "paquete", "inicio", "vence",
+    headers = ["id_alumno", "id_compra", "apellidos", "nombre", "id_plan", "paquete", "inicio", "vence",
                "precio", "pagado", "debe", "estado_pago", "medio_de_pago", "fecha_ultimo_pago"]
-    return headers, by_alumno(out, 5)
+    return headers, by_alumno(out, 6)
 
 
 def asistencias(gym_id, tz):
     rows = fetch_all(
         "ingresos",
-        "id,member_id,pago_id,check_in,clases_tomadas,limite_clases,nota,"
+        "id,member_id,pago_id,plan_id,check_in,clases_tomadas,limite_clases,nota,"
         "members!inner(apellidos,nombre),planes(label),member_plans(plan),groups(title)",
         gym_id, is_null=["deleted_at", "members.deleted_at"], neq={"tipo": "UPDATE"},
     )
@@ -120,12 +142,13 @@ def asistencias(gym_id, tz):
         (i["member_id"], i["pago_id"], i["members"]["apellidos"], i["members"]["nombre"],
          # hora local del gym; Excel no guarda zona horaria
          datetime.fromisoformat(i["check_in"]).astimezone(tz).replace(tzinfo=None) if i["check_in"] else None,
+         i["plan_id"],
          (i["planes"] or {}).get("label") or (i["member_plans"] or {}).get("plan"),
          (i["groups"] or {}).get("title"),
          i["clases_tomadas"], i["limite_clases"], i["nota"])
         for i in rows
     ]
-    headers = ["id_alumno", "id_paquete", "apellidos", "nombre", "fecha_hora", "paquete", "grupo",
+    headers = ["id_alumno", "id_compra", "apellidos", "nombre", "fecha_hora", "id_plan", "paquete", "grupo",
                "clases_tomadas", "limite_clases", "nota"]
     return headers, by_alumno(out, 4)
 
@@ -155,6 +178,7 @@ for gym_id in gym_ids:
     book.remove(book.active)
     for title, (headers, rows) in [
         ("Alumnos", alumnos(gym_id)),
+        ("Catálogo de paquetes", catalogo(gym_id)),
         ("Paquetes y pagos", paquetes(gym_id)),
         ("Asistencias", asistencias(gym_id, tz)),
     ]:
