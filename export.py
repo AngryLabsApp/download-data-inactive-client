@@ -7,10 +7,14 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from supabase import create_client
 
 PAGE = 1000  # tope de filas por request de Supabase
+
+# Colores de marca FlowPass (espejo de FlowPass-new/src/app.css)
+VERDE, VERDE_SUAVE, OSCURO, GRIS, BORDE_GRIS = "00F28B", "E8FFF2", "13131A", "F5F5F5", "CBD5E1"
+BORDE = Border(*(Side(style="thin", color=BORDE_GRIS),) * 4)
 
 MEDIOS = {
     "cash": "Efectivo", "transfer": "Transferencia",
@@ -159,7 +163,8 @@ def add_sheet(book, title, headers, rows):
     for r in rows:
         sheet.append(r)
     for c in sheet[1]:
-        c.font = Font(bold=True)
+        c.font = Font(bold=True, color=OSCURO)
+        c.fill = PatternFill("solid", fgColor=VERDE)
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
     for col in sheet.columns:
@@ -167,18 +172,18 @@ def add_sheet(book, title, headers, rows):
 
 
 # Pestaña "Cómo usar": lo que se le explica al cliente para cruzar pestañas.
-# Van en negrita los títulos (un solo texto en MAYÚSCULAS) y el encabezado "Código".
 GUIA = [
-    ["CÓMO USAR ESTE ARCHIVO"],
+    ("CÓMO USAR ESTE ARCHIVO",),
+    ["Creado por el equipo de desarrollo de FlowPass"],
     [],
-    ["PESTAÑAS"],
+    ("PESTAÑAS",),
     ["Alumnos", "Un alumno por fila."],
     ["Catálogo de paquetes", "Cada paquete que vende o vendió el gym (activo = No: ya no se vende)."],
     ["Paquetes y pagos", "Cada paquete que compró o renovó un alumno, con lo pagado y lo que debe."],
     ["Asistencias", "Cada asistencia de un alumno, con la compra con la que asistió."],
     [],
-    ["CÓMO SE RELACIONAN"],
-    ["Código", "Qué identifica", "Está en", "Sirve para"],
+    ("CÓMO SE RELACIONAN",),
+    ("Código", "Qué identifica", "Está en", "Sirve para"),
     ["id_alumno", "Un alumno", "Alumnos, Paquetes y pagos, Asistencias",
      "Traer los datos del alumno de una compra o asistencia"],
     ["id_plan", "Un tipo de paquete", "Catálogo de paquetes, Paquetes y pagos, Asistencias",
@@ -186,29 +191,93 @@ GUIA = [
     ["id_compra", "Una compra concreta", "Paquetes y pagos, Asistencias",
      "Ver con qué compra asistió el alumno, o cuántas asistencias tuvo cada compra"],
     [],
-    ["EJEMPLO"],
+    ("EJEMPLO DE FÓRMULA",),
     ["Precio del paquete en Asistencias (columna F = id_plan):"],
     ["=BUSCARV(F2; 'Catálogo de paquetes'!A:C; 3; FALSO)"],
     ["En Excel en inglés: =VLOOKUP(F2, 'Catálogo de paquetes'!A:C, 3, FALSE)"],
     [],
-    ["NOTAS"],
+    ("NOTAS",),
     ["Si pagado y debe están vacíos, es un paquete antiguo: el estado viene en estado_pago."],
     ["clases_tomadas y limite_clases en Asistencias son los valores al momento de esa asistencia."],
     ["Las fechas y horas están en la zona horaria del gym."],
+    [],
+    ("EJEMPLOS (los nombres y montos de aquí abajo son inventados)",),
+    [],
+    ("id_plan vs id_compra",),
+    ["id_plan = QUÉ paquete es (el del catálogo). Es el mismo para todos los que compraron ese paquete."],
+    ["id_compra = CUÁL compra fue. Cada compra o renovación tiene uno distinto."],
+    ("Alumno", "Paquete", "id_plan", "id_compra", "Qué significa"),
+    ["Juan", "Plan Mensual", "aaa", "111", "Juan compró el Plan Mensual en enero"],
+    ["Juan", "Plan Mensual", "aaa", "222", "Juan lo renovó en febrero: mismo id_plan, otra id_compra"],
+    ["María", "Plan Mensual", "aaa", "333", "María compró el mismo paquete que Juan: mismo id_plan"],
+    ["María", "Plan Ilimitado", "bbb", "444", "Otro paquete: otro id_plan"],
+    [],
+    ("Cómo leer una fila de \"Paquetes y pagos\"",),
+    ("Columna", "Valor", "Cómo se lee"),
+    ["paquete", "Plan Mensual", "Qué compró"],
+    ["inicio / vence", "01/02 – 01/03", "Desde y hasta cuándo puede usarlo"],
+    ["precio", "150", "Lo que costaba"],
+    ["pagado", "100", "Lo que ya pagó"],
+    ["debe", "50", "Lo que le falta pagar"],
+    ["estado_pago", "parcial", "pagado = completo, parcial = pagó una parte, pendiente = no pagó nada"],
+    ["→ Se lee:", "Juan compró el Plan Mensual del 01/02 al 01/03, costaba 150, pagó 100 y debe 50."],
+    [],
+    ("Cómo leer una fila de \"Asistencias\"",),
+    ("Columna", "Valor", "Cómo se lee"),
+    ["fecha_hora", "05/02 18:30", "Cuándo asistió (hora del gym)"],
+    ["id_compra", "222", "Con qué compra asistió (la renovación de febrero)"],
+    ["clases_tomadas / limite_clases", "3 / 8", "Era su clase 3 de 8 en ese momento (0 = ilimitado)"],
+    ["→ Se lee:", "Juan asistió el 05/02 a las 18:30 con su Plan Mensual de febrero; iba en su clase 3 de 8."],
+    [],
+    ("Preguntas típicas y cómo responderlas",),
+    ("Pregunta", "Dónde", "Cómo"),
+    ["¿Qué paquetes compró un alumno?", "Paquetes y pagos", "Filtrar por id_alumno (o por apellidos)"],
+    ["¿Cuánto debe un alumno?", "Paquetes y pagos", "Filtrar por id_alumno y sumar la columna debe"],
+    ["¿Cuántas clases usó de una compra?", "Asistencias", "Filtrar por id_compra y contar las filas"],
+    ["¿Cuánto cuesta un paquete?", "Catálogo de paquetes", "Buscar el id_plan"],
+    ["¿Quién compró cierto paquete?", "Paquetes y pagos", "Filtrar por id_plan (o por paquete)"],
 ]
 
 
-def add_guide(book):
-    sheet = book.create_sheet("Cómo usar")
-    for row in GUIA:
-        sheet.append(row)
-        cells = sheet[sheet.max_row]
-        if row[:1] == ["Código"] or (len(row) == 1 and row[0].isupper()):
+def add_guide(book, title, rows, widths):
+    # primera fila = título, segunda = firma; tupla de 1 = sección; tupla de varios = encabezado de tabla
+    # (las filas que siguen a un encabezado, hasta la próxima vacía, van con borde)
+    sheet = book.create_sheet(title)
+    sheet.sheet_view.showGridLines = False
+    in_table = False
+    for i, row in enumerate(rows):
+        sheet.append(list(row))
+        n = sheet.max_row
+        cells = [sheet.cell(n, col) for col in range(1, len(widths) + 1)]
+        for c in cells:
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+        if not row:
+            in_table = False
+        elif i == 0:
+            cells[0].font = Font(bold=True, size=18, color=OSCURO)
+        elif i == 1:
+            cells[0].font = Font(italic=True, color="64748B")
+        elif isinstance(row, tuple) and len(row) == 1:
             for c in cells:
-                c.font = Font(bold=True)
+                c.font = Font(bold=True, size=12, color=VERDE)
+                c.fill = PatternFill("solid", fgColor=OSCURO)
+        elif isinstance(row, tuple):
+            in_table = True
+            for c in cells[:len(row)]:
+                c.font = Font(bold=True, color=OSCURO)
+                c.fill = PatternFill("solid", fgColor=VERDE_SUAVE)
+                c.border = BORDE
+        elif in_table:
+            for c in cells[:len(row)]:
+                c.border = BORDE
         if row and row[0].startswith("="):
             cells[0].data_type = "s"  # mostrar la fórmula de ejemplo, no calcularla
-    for letter, width in zip("ABCD", (22, 22, 45, 70)):
+            cells[0].font = Font(name="Consolas")
+            cells[0].fill = PatternFill("solid", fgColor=GRIS)
+        if row and row[0].startswith("→"):
+            for c in cells:
+                c.font = Font(italic=True)
+    for letter, width in zip("ABCDE", widths):
         sheet.column_dimensions[letter].width = width
 
 
@@ -222,7 +291,7 @@ for gym_id in gym_ids:
 
     book = Workbook()
     book.remove(book.active)
-    add_guide(book)
+    add_guide(book, "Cómo usar", GUIA, (32, 22, 45, 20, 60))
     for title, (headers, rows) in [
         ("Alumnos", alumnos(gym_id)),
         ("Catálogo de paquetes", catalogo(gym_id)),
