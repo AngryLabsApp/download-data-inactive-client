@@ -19,6 +19,10 @@ Todo cambio debe respetar esas dos prioridades. Ante la duda, gana lo más simpl
 > un solo error de escritura afectaría la data real del cliente. Si una tarea pide cambiar datos,
 > no va en este repo.
 
+> **Lenguaje con el cliente: "negocio", nunca "gym".** Internamente (código, tablas, comentarios,
+> este documento) se dice *gym*. Todo texto que **ve el cliente** en el Excel (guía, encabezados,
+> notas) usa **"negocio"**, que es una palabra neutral: los clientes no son solo gimnasios.
+
 ---
 
 ## 1. Cómo se corre
